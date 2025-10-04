@@ -1,0 +1,31 @@
+name: Validate Docker Compose
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout devenv
+        uses: actions/checkout@v4
+        with:
+          path: devenv
+
+      - name: Checkout neems-core
+        uses: actions/checkout@v4
+        with:
+          repository: Newtown-Energy/neems-core
+          path: neems-core
+
+      - name: Checkout neems-react
+        uses: actions/checkout@v4
+        with:
+          repository: Newtown-Energy/neems-react
+          path: neems-react
+
+      - name: Validate docker-compose.yml
+        run: docker compose -f devenv/docker-compose.yml config > /dev/null
