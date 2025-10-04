@@ -11,18 +11,18 @@ jobs:
 
     steps:
       - name: Checkout devenv
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           path: devenv
 
       - name: Checkout neems-core
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: Newtown-Energy/neems-core
           path: neems-core
 
       - name: Checkout neems-react
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: Newtown-Energy/neems-react
           path: neems-react
