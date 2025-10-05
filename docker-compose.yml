@@ -12,6 +12,11 @@ services:
       - NEEMS_DEFAULT_COMPANY=1
     volumes:
       - shared-data:/app/data
+      # Mount source code for live reload
+      - ../neems-core:/usr/src/app
+      # Use named volume for build artifacts (faster rebuilds)
+      - cargo-cache:/usr/local/cargo/registry
+      - target-cache:/usr/src/app/target
     restart: unless-stopped
     # This service collects and processes data, writing to SQLite
 
@@ -32,6 +37,11 @@ services:
       - NEEMS_STATIC_DIR=/app/static
     volumes:
       - shared-data:/app/data
+      # Mount source code for live reload
+      - ../neems-core:/usr/src/app
+      # Use named volume for build artifacts (faster rebuilds)
+      - cargo-cache:/usr/local/cargo/registry
+      - target-cache:/usr/src/app/target
     depends_on:
       - neems-data
     restart: unless-stopped
@@ -47,6 +57,11 @@ services:
     environment:
       - NEEMS_REACT_PORT=5173
       - NEEMS_CORE_SERVER=http://neems-api:8000
+    volumes:
+      # Mount source code for live reload
+      - ../neems-react:/app
+      # Use named volume for node_modules (avoid host/container conflicts)
+      - node-modules:/app/node_modules
     depends_on:
       - neems-api
     restart: unless-stopped
@@ -55,3 +70,9 @@ services:
 volumes:
   shared-data:
     # Shared volume for SQLite database that both neems-data (write) and neems-api (read) access
+  cargo-cache:
+    # Cargo registry cache for faster Rust builds
+  target-cache:
+    # Rust build artifacts cache for faster rebuilds
+  node-modules:
+    # Node modules cache to avoid host/container conflicts

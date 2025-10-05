@@ -33,3 +33,34 @@ The development environment requires the following directory structure with all 
 The following services will be available:
 - **neems-api**: http://localhost:8000
 - **neems-react**: http://localhost:5173
+
+## Default Credentials
+
+For testing the application, use the following default admin credentials:
+- **Email**: `superadmin@example.com`
+- **Password**: `admin`
+
+## Development Workflow
+
+All services are configured with **live reload** for rapid development:
+
+### Making Changes
+
+- **neems-react**: Edit files in `../neems-react/src/` - Vite HMR will automatically update the browser
+- **neems-api**: Edit files in `../neems-core/neems-api/` - cargo-watch will detect changes and rebuild/restart the API
+- **neems-data**: Edit files in `../neems-core/neems-data/` - cargo-watch will detect changes and rebuild/restart the service
+
+### How it Works
+
+- Source code is mounted as volumes into the containers
+- Build artifacts (Rust `target/`, Node `node_modules/`) are stored in named Docker volumes for faster rebuilds
+- Changes to your local files are immediately reflected in the running containers
+
+### First Build
+
+The first time you run `docker compose up`, Rust services will take several minutes to:
+1. Install cargo-watch
+2. Download and compile dependencies
+3. Build the application
+
+Subsequent changes will be much faster as dependencies are cached.
