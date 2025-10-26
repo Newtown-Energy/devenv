@@ -38,6 +38,7 @@ services:
       - NEEMS_DEFAULT_PASSWORD=admin
       - NEEMS_STATIC_DIR=/app/static
       - NEEMS_TS_OUTPUT_DIR=/app/ts-types
+      - CARGO_PATH=/usr/local/cargo/bin/cargo
     volumes:
       - shared-data:/app/data
       # Mount source code for live reload
