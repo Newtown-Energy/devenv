@@ -63,6 +63,8 @@ The neems-api container automatically watches for Rust file changes and regenera
 The auto-generation process:
 - Watches `neems-api/src` and `neems-data/src` directories
 - Automatically runs when any Rust file changes
+- **Cleans up old `.ts` files** before regenerating (prevents orphaned types)
+- Regenerates only the types currently exported with `#[ts(export)]`
 - Outputs to `neems-react/src/types/generated/` (mounted via Docker)
 - Runs in the background alongside the API server
 
@@ -182,13 +184,22 @@ The project uses `ts-rs` to automatically generate TypeScript definitions from R
 
 1. Rust structs are annotated with `#[derive(TS)]` and `#[ts(export)]`
 2. The generation script (`neems-core/neems-api/src/generate_types.rs`) exports all types
-3. TypeScript files are written to `neems-react/src/types/generated/`
+3. **Old `.ts` files are automatically deleted** before regeneration to prevent orphaned types
+4. TypeScript files are written to `neems-react/src/types/generated/`
 
-### Running Type Generation
+### Automatic Generation (Development Mode)
+
+**TypeScript types are automatically regenerated when Rust files change!** The neems-api container runs a background watcher that:
+- Monitors Rust source files for changes
+- Cleans up old type definitions
+- Regenerates all exported types
+- No manual intervention needed
+
+### Manual Generation (if needed)
 
 **Always run inside the neems-api container:**
 ```bash
-docker compose exec neems-api cargo test generate_typescript_types -- --nocapture
+docker compose exec neems-api cargo test --features test-staging generate_typescript_types -- --nocapture
 ```
 
 ### Auto-Generated Files
