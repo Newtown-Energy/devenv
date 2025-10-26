@@ -220,14 +220,136 @@ Regenerate TypeScript types after:
 - Updating database models
 - Modifying any Rust type that's exported to TypeScript
 
+## Continuous Integration (CI)
+
+The neems-core project uses **GitHub Actions** for automated testing and quality checks.
+
+### CI Checks
+
+Every Pull Request and push to the main branch automatically runs:
+
+1. **Format Check** - Ensures all Rust code is formatted correctly
+2. **Clippy Lint** - Checks for code quality issues and best practices
+3. **EditorConfig** - Validates file formatting (line endings, whitespace, etc.)
+4. **GitHub Actions Lint** - Validates workflow YAML files with actionlint
+5. **TypeScript Generation** - Verifies TypeScript types can be generated
+6. **Test Suite** - Runs all tests with the CI profile using nextest
+
+### Running CI Checks Locally
+
+Before pushing code, you can run the same checks that CI will run using `dosh`:
+
+```bash
+# Run ALL lint checks (same as CI)
+./bin/dosh lint
+
+# Or run individual checks:
+./bin/dosh lint-format          # Check Rust formatting
+./bin/dosh lint-clippy          # Run Clippy linter
+./bin/dosh lint-editorconfig    # Check EditorConfig compliance
+./bin/dosh lint-actionlint      # Validate GitHub Actions workflows
+
+# Auto-format code
+cargo fmt --all
+
+# Run test suite (same as CI)
+./bin/dosh test
+
+# TypeScript generation check
+./bin/dosh generate-types
+```
+
+**Note**: Optional lint checks require tools to be installed:
+- `editorconfig-checker`: https://editorconfig-checker.github.io/
+- `actionlint`: https://github.com/rhysd/actionlint
+
+The `./bin/dosh lint` command will skip optional checks if tools aren't installed.
+
+### CI Configuration Files
+
+- `.github/workflows/ci.yml` - Main CI orchestrator (calls lint and test workflows)
+- `.github/workflows/lint.yml` - Reusable linting workflow (format, clippy, editorconfig)
+- `.github/workflows/test.yml` - Reusable testing workflow (TypeScript generation, unit & integration tests)
+- `.github/dependabot.yml` - Automated dependency updates for GitHub Actions and Cargo
+- `rustfmt.toml` - Rust code formatting rules
+- `clippy.toml` - Clippy linting configuration
+- `.config/nextest.toml` - Test runner configuration (includes CI profile)
+
+### CI Test Profile
+
+The CI uses a dedicated nextest profile with optimizations:
+- 2 test threads (for CI environment)
+- 2 retries on flaky tests
+- Fail-fast mode (stops on first failure)
+- 60-second timeout for slow tests
+- Generates JUnit XML reports
+
+### Automated Dependency Updates
+
+The project uses **Dependabot** to automatically keep dependencies up to date:
+
+**What gets updated:**
+- GitHub Actions (weekly on Mondays)
+- Cargo dependencies (weekly on Mondays)
+
+**How it works:**
+- Dependabot opens PRs for dependency updates
+- CI automatically runs on Dependabot PRs
+- Patch and minor updates are grouped together to reduce PR noise
+- PRs are labeled with `dependencies` and ecosystem-specific tags
+
+**Reviewing Dependabot PRs:**
+1. Check the changelog for breaking changes
+2. Review CI status (must pass)
+3. Test locally if needed
+4. Merge when confident
+
+**Dependabot PR labels:**
+- `dependencies` - All dependency updates
+- `github-actions` - GitHub Actions updates
+- `rust` - Cargo dependency updates
+
+### Troubleshooting CI Failures
+
+**Format failures:**
+```bash
+# Fix formatting issues
+cargo fmt --all
+```
+
+**Clippy failures:**
+```bash
+# See what clippy is complaining about
+cargo clippy --all-targets --all-features
+
+# Fix or allow specific warnings in code:
+#[allow(clippy::lint_name)]
+```
+
+**Test failures:**
+```bash
+# Run tests locally with same configuration
+./bin/dosh test
+
+# Run specific test
+cargo nextest run test_name
+```
+
+**TypeScript generation failures:**
+```bash
+# Regenerate types
+cargo test --features test-staging generate_typescript_types
+```
+
 ## General Best Practices
 
 1. **Always check container status** before running commands
 2. **Use `docker compose exec`** for all build/test/development commands
-3. **Read docker-compose.yml** to understand service dependencies
-4. **Check Dockerfiles** to understand what tools are available in each container
-5. **Never assume** tools are installed on the host machine
-6. **When in doubt**, ask the user which container to use
+3. **Run CI checks locally** before pushing to avoid CI failures
+4. **Read docker-compose.yml** to understand service dependencies
+5. **Check Dockerfiles** to understand what tools are available in each container
+6. **Never assume** tools are installed on the host machine
+7. **When in doubt**, ask the user which container to use
 
 ## Quick Reference
 
