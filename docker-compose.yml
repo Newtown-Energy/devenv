@@ -35,10 +35,13 @@ services:
       - NEEMS_DEFAULT_EMAIL=superadmin@example.com
       - NEEMS_DEFAULT_PASSWORD=admin
       - NEEMS_STATIC_DIR=/app/static
+      - NEEMS_TS_OUTPUT_DIR=/app/ts-types
     volumes:
       - shared-data:/app/data
       # Mount source code for live reload
       - ../neems-core:/usr/src/app
+      # Mount TypeScript types directory for auto-generation
+      - ../neems-react/src/types/generated:/app/ts-types
       # Use named volume for build artifacts (faster rebuilds)
       - cargo-cache:/usr/local/cargo/registry
       - target-cache:/usr/src/app/target
