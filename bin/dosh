@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# Do - The Simplest Build Tool on Earth.
+# Documentation and examples see https://github.com/8gears/do
+#
+SCRIPTNAME=`basename "$0"`
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+BASEDIR=$(dirname -- "$SCRIPT_DIR")
+cd ${BASEDIR}/${PROJ_NAME}
+
+clone() {
+    # Git clone neems-core and neems-react
+    cd ..
+
+    # Clone neems-react
+    if ! [ -d neems-react ]; then
+        echo "Cloning neems-react..."
+        if ! git clone git@github.com:Newtown-Energy/neems-react.git 2>&1 | tee /tmp/git_error.log; then
+            if grep -qiE "(permission denied|authentication failed|publickey)" /tmp/git_error.log; then
+                echo "SSH authentication failed, falling back to HTTPS..."
+                git clone https://github.com/Newtown-Energy/neems-react.git
+            else
+                echo "Error: Failed to clone neems-react (non-auth error)"
+                cat /tmp/git_error.log
+                return 1
+            fi
+        fi
+    fi
+
+    # Clone neems-core
+    if ! [ -d neems-core ]; then
+        echo "Cloning neems-core..."
+        if ! git clone git@github.com:Newtown-Energy/neems-core.git 2>&1 | tee /tmp/git_error.log; then
+            if grep -qiE "(permission denied|authentication failed|publickey)" /tmp/git_error.log; then
+                echo "SSH authentication failed, falling back to HTTPS..."
+                git clone https://github.com/Newtown-Energy/neems-core.git
+            else
+                echo "Error: Failed to clone neems-core (non-auth error)"
+                cat /tmp/git_error.log
+                return 1
+            fi
+        fi
+    fi
+}
+
+# Run command.  Complain if the command isn't found.
+"$@" # <- execute the task and exit with its status code
