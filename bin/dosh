@@ -43,4 +43,6 @@ clone() {
 }
 
 # Run command.  Complain if the command isn't found.
-"$@" # <- execute the task and exit with its status code
+"$@" # <- execute the task
+[ "$#" -gt 0 ] || printf "Usage:\n\t./${SCRIPTNAME} %s\n" "($(compgen -A function | grep '^[^_]' | paste -sd '|' -))"
+
