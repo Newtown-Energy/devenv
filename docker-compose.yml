@@ -40,8 +40,8 @@ services:
       - shared-data:/app/data
       # Mount source code for live reload
       - ../neems-core:/usr/src/app
-      # Mount TypeScript types directory for auto-generation
-      - ../neems-react/src/types/generated:/app/ts-types
+      # Mount shared local-types directory for auto-generated TypeScript types
+      - ../local-types:/app/ts-types
       # Use named volume for build artifacts (faster rebuilds)
       - cargo-cache:/usr/local/cargo/registry
       - target-cache:/usr/src/app/target
@@ -65,6 +65,9 @@ services:
       - ../neems-react:/app
       # Use named volume for node_modules (avoid host/container conflicts)
       - node-modules:/app/node_modules
+      # Mount shared local-types directory (bun link connects it into node_modules)
+      - ../local-types:/local-types
+    command: ["/app/docker-entrypoint.sh"]
     depends_on:
       - neems-api
     restart: unless-stopped
