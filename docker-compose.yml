@@ -36,6 +36,25 @@ services:
       - NEEMS_DEFAULT_PASSWORD=admin
       - NEEMS_STATIC_DIR=/app/static
       - NEEMS_TS_OUTPUT_DIR=/app/ts-types
+      # Ceiling on the target-cache volume below, which neems-api, neems-data
+      # and neems-rtac-sim all write into. Cargo never garbage-collects
+      # target/, and this volume reached 173 GB and filled the Docker VM's disk
+      # before anything swept it (see issue #22). The neems-api entrypoint
+      # sweeps down to this size on start and every CARGO_TARGET_SWEEP_INTERVAL
+      # seconds after — startup alone is not enough, since `restart:
+      # unless-stopped` means a container can run for weeks between starts.
+      #
+      # One clean build of the whole workspace — every bin and every test
+      # binary, single fingerprint, no incremental — measures 5.7 GB. Do not
+      # set the ceiling below that: it would only sweep away artifacts that are
+      # immediately rebuilt.
+      - CARGO_TARGET_MAXSIZE=10GB
+      - CARGO_TARGET_SWEEP_INTERVAL=21600
+      # target/debug/incremental gets its own budget, applied first, because
+      # cargo-sweep will not touch that directory but does count it toward the
+      # total — so a large incremental cache would otherwise make the sweep
+      # delete every artifact it *can* reach to compensate.
+      - CARGO_INCREMENTAL_MAXSIZE_MB=3072
     volumes:
       - shared-data:/app/data
       # Mount source code for live reload
