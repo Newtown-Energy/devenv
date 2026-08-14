@@ -70,6 +70,9 @@ services:
       - NEEMS_DEFAULT_PASSWORD=admin
       - NEEMS_STATIC_DIR=/app/static
       - NEEMS_TS_OUTPUT_DIR=/app/ts-types
+      # Enables the demo-only write endpoints (/1/Demo/AlarmState and the
+      # /1/Alarms/Forced set view). Off unless set, so production stays safe.
+      - NEEMS_DEMO_MODE=1
       # Ceiling on the target-cache volume below, which neems-api, neems-data
       # and neems-rtac-sim all write into. Cargo never garbage-collects
       # target/, and this volume reached 173 GB and filled the Docker VM's disk
