@@ -50,6 +50,20 @@ All services are configured with **live reload** for rapid development:
 - **neems-api**: Edit files in `../neems-core/neems-api/` - cargo-watch will detect changes and rebuild/restart the API
 - **neems-data**: Edit files in `../neems-core/neems-data/` - cargo-watch will detect changes and rebuild/restart the service
 
+### Choosing the Site Design
+
+The stack runs neems-core's default site design. To run another, set
+`NEEMS_SITE_DESIGN` when bringing it up:
+
+```bash
+NEEMS_SITE_DESIGN=site-2 docker compose up -d
+```
+
+It reaches neems-api, neems-data and neems-rtac-sim together, which must agree.
+Changing it takes this `up -d`, which recreates the containers; a `restart`
+reuses the old environment. Bring the stack up without it to go back to the
+default.
+
 ### How it Works
 
 - Source code is mounted as volumes into the containers
