@@ -10,6 +10,12 @@ services:
       context: ../neems-core
       dockerfile: neems-rtac-sim/Dockerfile
     container_name: neems-rtac-sim
+    environment:
+      # Which site design the stack runs (see neems-core's
+      # docs/environment.md). The three Rust services share alarm history,
+      # which only means anything under the design that wrote it, so all three
+      # take the same value. Unset, or blank as here, means the default.
+      - NEEMS_SITE_DESIGN=${NEEMS_SITE_DESIGN:-}
     volumes:
       # Mount source code for live reload
       - ../neems-core:/usr/src/app
@@ -28,6 +34,8 @@ services:
       - SITE_DATABASE_URL=sqlite:///app/data/site-data.sqlite
       - NEEMS_DEFAULT_SITE=1
       - NEEMS_DEFAULT_COMPANY=1
+      # Must match neems-rtac-sim and neems-api; see neems-rtac-sim above.
+      - NEEMS_SITE_DESIGN=${NEEMS_SITE_DESIGN:-}
       # The RTAC collector is off unless this is truthy, so that the system
       # never follows a possibly-absent controller in production. Dev has a
       # simulated one standing by, so turn it on here — without it the Modbus
@@ -73,6 +81,8 @@ services:
       # Enables the demo-only write endpoints (/1/Demo/AlarmState and the
       # /1/Alarms/Forced set view). Off unless set, so production stays safe.
       - NEEMS_DEMO_MODE=1
+      # Must match neems-rtac-sim and neems-data; see neems-rtac-sim above.
+      - NEEMS_SITE_DESIGN=${NEEMS_SITE_DESIGN:-}
       # Ceiling on the target-cache volume below, which neems-api, neems-data
       # and neems-rtac-sim all write into. Cargo never garbage-collects
       # target/, and this volume reached 173 GB and filled the Docker VM's disk
