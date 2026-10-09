@@ -42,6 +42,206 @@ clone() {
     fi
 }
 
+# --- Real RTAC ---------------------------------------------------------------
+# The stack talks to the simulated RTAC by default.  These tasks point
+# neems-data at a real one instead, reached over the VPN through an SSH tunnel.
+# Connection details come from .env (see env.example and the README).
+
+_load-env() {
+    if [ -f .env ]; then
+        set -a
+        . ./.env
+        set +a
+    fi
+}
+
+_require() {
+    # Usage: _require VARNAME
+    if [ -z "${!1}" ]; then
+        echo "Error: $1 isn't set in .env (see env.example)" >&2
+        exit 1
+    fi
+}
+
+_tunnel-socket() {
+    echo "/tmp/neems-rtac-tunnel-$(id -u).sock"
+}
+
+_tunnel-is-up() {
+    ssh -S "$(_tunnel-socket)" -O check "${REAL_RTAC_SSH}" > /dev/null 2>&1
+}
+
+_tunnel-spec() {
+    # What .env asks the tunnel to forward: bind:port:host:port
+    echo "${REAL_RTAC_BIND:-127.0.0.1}:${REAL_RTAC_LOCAL_PORT:-5020}:${REAL_RTAC_TARGET}"
+}
+
+_tunnel-spec-file() {
+    # What the open tunnel does forward, recorded when it was opened.  The two
+    # differ once .env is edited under a live tunnel.
+    echo "$(_tunnel-socket).spec"
+}
+
+_slave-id() {
+    # Print REAL_RTAC_SLAVE_ID as a plain decimal, or fail.  neems-data falls
+    # back to unit 1 on a value it can't parse, which here would mean silently
+    # addressing a different unit on a real controller.
+    local id=${REAL_RTAC_SLAVE_ID}
+    if ! [[ "$id" =~ ^[0-9]{1,3}$ ]] || [ "$((10#$id))" -gt 255 ]; then
+        echo "Error: REAL_RTAC_SLAVE_ID must be a decimal number from 0 to 255, not '${id}'" >&2
+        return 1
+    fi
+    echo "$((10#$id))"
+}
+
+_site-design() {
+    # The site design neems-data should come back up with.  Recreating it
+    # without one would put it, and neems-rtac-sim along with it, on the
+    # default while neems-api stayed on another, so keep what the stack has.
+    # Read it from the container's configuration, not from inside it: the
+    # container may exist without running.
+    if [ -n "${NEEMS_SITE_DESIGN+set}" ]; then
+        echo "${NEEMS_SITE_DESIGN}"
+        return 0
+    fi
+    local service container
+    for service in neems-data neems-api; do
+        container=$(docker compose ps -a -q "$service" 2> /dev/null)
+        if [ -n "$container" ]; then
+            docker inspect "$container" --format '{{range .Config.Env}}{{println .}}{{end}}' \
+                | sed -n 's/^NEEMS_SITE_DESIGN=//p'
+            return 0
+        fi
+    done
+}
+
+_rtac-answers() {
+    # Usage: _rtac-answers BIND PORT UNIT
+    # The tunnel being up only says SSH connected, and its local port accepts
+    # connections whatever is at the far end.  So send one Modbus read (holding
+    # register 0) through it and see whether anything comes back.  An exception
+    # reply counts: it still means a Modbus server is there.
+    local unit=$(printf '%02x' "$3")
+    (
+        exec 3<> "/dev/tcp/$1/$2" || exit 1
+        printf "NE\x00\x00\x00\x06\x${unit}\x03\x00\x00\x00\x01" >&3
+        LC_ALL=C read -r -t 5 -n 1 -u 3
+    ) 2> /dev/null
+}
+
+vpn() {
+    # Start tinc in the foreground.  Leave it running in its own terminal.
+    _load-env
+    local netname=${TINC_NETNAME:-newtown}
+    # Package managers put tincd in an sbin directory that is often not on PATH.
+    local tincd=$(PATH="$PATH:/opt/homebrew/sbin:/usr/local/sbin:/usr/sbin:/sbin" command -v tincd)
+    [ -n "$tincd" ] || { echo "Error: tincd isn't installed" >&2; exit 1; }
+    # Name the pid file: Homebrew's tincd defaults to a directory that doesn't
+    # exist and refuses to start.
+    sudo "$tincd" -n "$netname" -D -d2 --pidfile="/var/run/tinc.${netname}.pid"
+}
+
+rtac-tunnel() {
+    # Forward a local port to the real RTAC through the machine on its network.
+    _load-env
+    _require REAL_RTAC_SSH
+    _require REAL_RTAC_TARGET
+    local spec=$(_tunnel-spec)
+    if _tunnel-is-up; then
+        if [ "$(cat "$(_tunnel-spec-file)" 2> /dev/null)" = "$spec" ]; then
+            echo "Tunnel is already up"
+            return 0
+        fi
+        # An open tunnel left over from other settings would carry the
+        # collector's writes to whatever it was opened for.
+        echo "Tunnel is up with different settings; reopening it"
+        rtac-tunnel-down
+    fi
+    ssh -f -N -M -S "$(_tunnel-socket)" \
+        ${REAL_RTAC_SSH_KEY:+-i "${REAL_RTAC_SSH_KEY}"} \
+        -o ExitOnForwardFailure=yes \
+        -o ServerAliveInterval=30 \
+        -o ConnectTimeout=10 \
+        -L "$spec" \
+        "${REAL_RTAC_SSH}" \
+        || { echo "Error: couldn't open the tunnel.  Is the VPN up?  (./bin/dosh vpn)" >&2; exit 1; }
+    echo "$spec" > "$(_tunnel-spec-file)"
+    echo "Tunnel is up: ${spec} via ${REAL_RTAC_SSH}"
+}
+
+rtac-tunnel-down() {
+    _load-env
+    _require REAL_RTAC_SSH
+    if _tunnel-is-up; then
+        ssh -S "$(_tunnel-socket)" -O exit "${REAL_RTAC_SSH}" > /dev/null 2>&1
+        echo "Tunnel closed"
+    else
+        echo "Tunnel is not up"
+    fi
+    rm -f "$(_tunnel-spec-file)"
+}
+
+rtac-real() {
+    # Point neems-data at the real RTAC.  The collector is closed-loop, so this
+    # writes to the controller as well as reading it.
+    _load-env
+    _require REAL_RTAC_SLAVE_ID
+    local unit
+    unit=$(_slave-id) || exit 1
+    local design=$(_site-design)
+    rtac-tunnel
+    NEEMS_SITE_DESIGN="$design" \
+    RTAC_ADDRESS="host.docker.internal:${REAL_RTAC_LOCAL_PORT:-5020}" \
+    RTAC_SLAVE_ID="$unit" \
+        docker compose up -d neems-data \
+        || { echo "Error: couldn't recreate neems-data; it is still following whatever it was" >&2; exit 1; }
+    echo "neems-data now follows the real RTAC.  Watch it with: docker compose logs -f neems-data"
+}
+
+rtac-sim() {
+    # Point neems-data back at the simulator and close the tunnel.
+    _load-env
+    local design=$(_site-design)
+    # Leave the tunnel open if this fails: neems-data is still using it.
+    NEEMS_SITE_DESIGN="$design" \
+        env -u RTAC_ADDRESS -u RTAC_SLAVE_ID docker compose up -d neems-data \
+        || { echo "Error: couldn't recreate neems-data; it is still following whatever it was" >&2; exit 1; }
+    if [ -n "${REAL_RTAC_SSH}" ] && _tunnel-is-up; then
+        rtac-tunnel-down
+    fi
+    echo "neems-data now follows the simulator"
+}
+
+rtac-status() {
+    _load-env
+    local address=$(docker compose exec -T neems-data printenv RTAC_ADDRESS 2> /dev/null)
+    echo "neems-data RTAC_ADDRESS: ${address:-(neems-data is not running)}"
+
+    if [ -z "${REAL_RTAC_SSH}" ]; then
+        echo "Tunnel: not configured (REAL_RTAC_SSH isn't set in .env)"
+        return 0
+    fi
+    if ! _tunnel-is-up; then
+        echo "Tunnel: down"
+        return 0
+    fi
+    # Report what the tunnel forwards, which is not what .env says if .env was
+    # edited since it was opened.
+    local spec=$(cat "$(_tunnel-spec-file)" 2> /dev/null)
+    spec=${spec:-$(_tunnel-spec)}
+    echo "Tunnel: up, ${spec}"
+    [ "$spec" = "$(_tunnel-spec)" ] || echo "Tunnel: .env has changed since it was opened; rtac-tunnel will reopen it"
+    local unit
+    unit=$(_slave-id 2> /dev/null) || unit=1
+    local bind=${spec%%:*}
+    local rest=${spec#*:}
+    if _rtac-answers "$bind" "${rest%%:*}" "$unit"; then
+        echo "RTAC: answering Modbus as unit ${unit}"
+    else
+        echo "RTAC: no Modbus answer as unit ${unit} from ${rest#*:}"
+    fi
+}
+
 # Run command.  Complain if the command isn't found.
 "$@" # <- execute the task
 [ "$#" -gt 0 ] || printf "Usage:\n\t./${SCRIPTNAME} %s\n" "($(compgen -A function | grep '^[^_]' | paste -sd '|' -))"

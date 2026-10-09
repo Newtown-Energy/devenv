@@ -42,8 +42,11 @@ services:
       # path, the readings it writes, and every endpoint serving them are
       # dead locally.
       - RTAC_ENABLED=1
-      - RTAC_ADDRESS=neems-rtac-sim:502
-      - RTAC_SLAVE_ID=1
+      # The simulator unless overridden. `bin/dosh rtac-real` overrides both to
+      # reach a real controller through an SSH tunnel on the host (see the
+      # README); a plain `docker compose up -d` goes back to the simulator.
+      - RTAC_ADDRESS=${RTAC_ADDRESS:-neems-rtac-sim:502}
+      - RTAC_SLAVE_ID=${RTAC_SLAVE_ID:-1}
       # The collector is closed-loop: it polls neems-api for the site's active
       # schedule command and drives the RTAC from it. Without credentials it
       # stays read-only and logs a warning.
@@ -57,6 +60,11 @@ services:
       # Use named volume for build artifacts (faster rebuilds)
       - cargo-cache:/usr/local/cargo/registry
       - target-cache:/usr/src/app/target
+    extra_hosts:
+      # Docker Desktop defines this name itself; Linux needs it spelled out.
+      # The real-RTAC tunnel listens on the host, so the collector reaches it
+      # by this name.
+      - host.docker.internal:host-gateway
     depends_on:
       - neems-rtac-sim
     restart: unless-stopped
