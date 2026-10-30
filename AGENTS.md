@@ -114,8 +114,9 @@ docker compose exec neems-react npm run generate-types
 # Access database
 docker compose exec neems-db sqlite3 /data/neems.db
 
-# Run migrations
-docker compose exec neems-api diesel migration run
+# Run migrations (both databases; neems-api and neems-data refuse to start
+# while any are pending)
+docker compose run --rm neems-migrate
 ```
 
 ### When to Start/Stop Containers
