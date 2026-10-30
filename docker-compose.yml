@@ -84,6 +84,8 @@ services:
       - SITE_DATABASE_URL=sqlite:///app/data/site-data.sqlite
       - NEEMS_DEFAULT_EMAIL=superadmin@example.com
       - NEEMS_DEFAULT_PASSWORD=admin
+      # The well-known admin password is refused unless opted in to. Dev only.
+      - NEEMS_ALLOW_DEFAULT_CREDENTIALS=true
       - NEEMS_STATIC_DIR=/app/static
       - NEEMS_TS_OUTPUT_DIR=/app/ts-types
       # Enables the demo-only write endpoints (/1/Demo/AlarmState and the
