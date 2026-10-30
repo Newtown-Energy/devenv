@@ -15,17 +15,5 @@ jobs:
         with:
           path: devenv
 
-      - name: Checkout neems-core
-        uses: actions/checkout@v7
-        with:
-          repository: Newtown-Energy/neems-core
-          path: neems-core
-
-      - name: Checkout neems-react
-        uses: actions/checkout@v7
-        with:
-          repository: Newtown-Energy/neems-react
-          path: neems-react
-
       - name: Validate docker-compose.yml
         run: docker compose -f devenv/docker-compose.yml config > /dev/null
